@@ -79,11 +79,10 @@ def train(epoch):
     loss_train += - gamma*K
     acc_train = accuracy(output[idx_train], labels[idx_train])  
     loss_train.backward()
-    K_spsa = Kemeny_spsa(adj._indices(), model.weighted_adj.detach(), adj.size(), eta)
-    model.weighted_adj.grad += - gamma*K_spsa
+    model.weighted_adj.grad += - gamma*Kemeny_spsa(adj._indices(), model.weighted_adj.detach(), adj.size(), eta)
     optimizer.step()
-    model.apply(Clipper)
     #Should I still normalize the weighted_adj after step?
+    model.apply(Clipper)
     
     if not args.fastmode:
         # Evaluate validation set performance separately,
