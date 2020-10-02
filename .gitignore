@@ -1,7 +1,7 @@
 pygcn_kemeny/notes.txt
 P.log
 log_to_P.py
-adjacency.log
+#adjacency.log
 dist
 build
 pygcn_kemeny.egg-info
