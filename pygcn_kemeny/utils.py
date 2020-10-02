@@ -3,7 +3,7 @@ import scipy.sparse as sp
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
-
+from Markov_chain.Markov_chain_new import MarkovChain
 
 class SpecialSpmmFunction(torch.autograd.Function):
     """
@@ -37,8 +37,19 @@ class SpecialSpmmFunction(torch.autograd.Function):
 class SpecialSpmm(nn.Module):
     def forward(self, indices, values, shape, b):
         return SpecialSpmmFunction.apply(indices, values, shape, b)
-###Check if this is needed
-spmm = SpecialSpmm()
+
+#spmm = SpecialSpmm()
+
+class WeightClipper(object):
+    def __init__(self, frequency=5):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        # filter the variables to get the ones you want
+        if hasattr(module, 'weighted_adj'):
+            w = module.weighted_adj
+            w = w.clamp(0, 1)
+            module.weighted_adj.data = w
 
 
 def encode_onehot(labels):
@@ -67,7 +78,7 @@ def load_data(path="../data/cora/", dataset="cora"):
                      dtype=np.int32).reshape(edges_unordered.shape)
     adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
                         shape=(labels.shape[0], labels.shape[0]),
-                        dtype=np.float32)
+                        dtype=np.float64)
 
     # build symmetric adjacency matrix
     adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
@@ -115,4 +126,30 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     values = torch.from_numpy(sparse_mx.data)
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
+
+def Kemeny(indices, values, size):
+    """Calculate the Kemeny constant."""
+    P = torch.sparse.DoubleTensor(indices, values.clamp(0,1), size)
+    return MarkovChain(P.to_dense().numpy()).K
+
+
+def Kemeny_spsa(indices, values, size, eta):
+    """Calculate gradient of Kemeny constant using SPSA."""
+    #NOTE: the gradients are only calculated for the edges in the network.
+    n = values.shape[0]
+    delta = np.random.choice([-1,1], n)
+
+    values1 = (values + eta*delta).clamp(0,1)   #is this implementation oke? Using clamp(0,1), but also using SPSA for not all params.
+    values2 = (values - eta*delta).clamp(0,1)
+
+    P1 = torch.sparse.FloatTensor(indices, values1, size) 
+    P2 = torch.sparse.FloatTensor(indices, values2, size)
+
+    K1 = MarkovChain(P1.to_dense().numpy()).K
+    K2 = MarkovChain(P2.to_dense().numpy()).K
+
+    grads = torch.FloatTensor([(K1-K2)/2*eta*delta[i] for i in range(n)])
+    return grads
+
+
 

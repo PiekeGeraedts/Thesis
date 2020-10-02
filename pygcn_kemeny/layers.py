@@ -4,7 +4,7 @@ import torch
 
 from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
-from utils import SpecialSpmm
+from pygcn_kemeny.utils import SpecialSpmm
 
 
 class GraphConvolution(Module):
@@ -32,7 +32,6 @@ class GraphConvolution(Module):
 
     def forward(self, input, indices, values, size):
         support = torch.mm(input, self.weight)  
-        #output = torch.spmm(adj, support)    
         output = self.sparsemm(indices, values, size, support)
 
         if self.bias is not None:

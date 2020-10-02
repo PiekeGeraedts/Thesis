@@ -1,0 +1,5 @@
+In pygcn_Kemeny:
+-The adjacency matrix returned by utils is not symmetrically normalized. For now that doesn't matter, we don't use these values anyway.
+
+Else:
+-add JB's Markov_Chain module to required installments in setup.py

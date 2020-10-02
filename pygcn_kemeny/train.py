@@ -10,9 +10,8 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from pygcn.utils import load_data, accuracy
-#from pygcn.models import GCN
-from models import GCN
+from pygcn_kemeny.utils import load_data, accuracy, Kemeny, Kemeny_spsa, WeightClipper
+from pygcn_kemeny.models import GCN
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -44,6 +43,10 @@ if args.cuda:
 # Load data
 adj, features, labels, idx_train, idx_val, idx_test = load_data()
 
+print ('!!!!!!!!!!!!!!!!!!!!!!!!')
+print ('WARNING: Check save (location) of plots')
+print ('!!!!!!!!!!!!!!!!!!!!!!!!')
+
 # Model and optimizer
 model = GCN(nfeat=features.shape[1],
             nhid=args.hidden,
@@ -52,6 +55,9 @@ model = GCN(nfeat=features.shape[1],
             nnz=adj._nnz())
 optimizer = optim.Adam(model.parameters(),
                        lr=args.lr, weight_decay=args.weight_decay)
+Clipper = WeightClipper()
+gamma = 10**-5
+eta = 10**-6    #should be decreasing with epochs
 
 if args.cuda:
     model.cuda()
@@ -69,9 +75,17 @@ def train(epoch):
     optimizer.zero_grad()
     output = model(features, adj)
     loss_train = F.nll_loss(output[idx_train], labels[idx_train])
+    K = Kemeny(adj._indices(), model.weighted_adj.detach(), adj.size())
+    print (K)
+    
+    loss_train += - gamma*K
     acc_train = accuracy(output[idx_train], labels[idx_train])  
     loss_train.backward()
-    optimizer.step()     
+    K_spsa = Kemeny_spsa(adj._indices(), model.weighted_adj.detach(), adj.size(), eta)
+    model.weighted_adj.grad += - gamma*K_spsa
+    optimizer.step()
+    model.apply(Clipper)
+    #Should I still normalize the weighted_adj after step?
     
     if not args.fastmode:
         # Evaluate validation set performance separately,
@@ -84,13 +98,15 @@ def train(epoch):
     #Keep track of train and val. accuracy
     accval_lst.append(acc_val.item())
     acctrn_lst.append(acc_train.item())
+    K_lst.append(K)
 
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_train: {:.4f}'.format(loss_train.item()),
           'acc_train: {:.4f}'.format(acc_train.item()),
           'loss_val: {:.4f}'.format(loss_val.item()),
           'acc_val: {:.4f}'.format(acc_val.item()),
-          'time: {:.4f}s'.format(time.time() - t))
+          'time: {:.4f}s'.format(time.time() - t),
+          'Kemeny: {:.4f}'.format(K))
 
 
 def test(): #similar to train, but in eval mode and on test data.
@@ -107,6 +123,7 @@ def test(): #similar to train, but in eval mode and on test data.
 t_total = time.time()
 acctrn_lst = []
 accval_lst = []
+K_lst = []
 for epoch in range(args.epochs):
     train(epoch)
 print("Optimization Finished!")
@@ -116,7 +133,6 @@ print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 test()
 
 #Plotting
-
 import matplotlib.pyplot as plt
 plt.plot(acctrn_lst)
 plt.title('Accuracy Train Set')
@@ -126,4 +142,9 @@ plt.show()
 plt.plot(accval_lst)
 plt.title('Accuracy Validation Set')
 plt.savefig('accuracyvalidation_{:.3f}.jpg'.format(time.time()))
+plt.show()
+
+plt.plot(K_lst)
+plt.title('Progress Kemeny Constant')
+plt.savefig('kemeny_{:.3f}.jpg'.format(time.time()))
 plt.show()
