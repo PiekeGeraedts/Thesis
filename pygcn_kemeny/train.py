@@ -76,8 +76,6 @@ def train(epoch):
     output = model(features, adj)
     loss_train = F.nll_loss(output[idx_train], labels[idx_train])
     K = Kemeny(adj._indices(), model.weighted_adj.detach(), adj.size())
-    print (K)
-    
     loss_train += - gamma*K
     acc_train = accuracy(output[idx_train], labels[idx_train])  
     loss_train.backward()
