@@ -42,24 +42,13 @@ if args.cuda:
 
 # Load data
 adj, features, labels, idx_train, idx_val, idx_test = load_data()
-#write adjacency matrix to log file
-'''
-with open("adjacency.log", "a") as f:
-    n,m = adj.shape
-    for i in range(m):
-        #the adj.item() of each row sum to one.
-        f.write(f"{i}-")
-        for j in range(n):   
-            if (adj[i,j].item() != 0.0):
-                f.write(f"{j}:{adj[i,j].item()} ")
-        f.write('\n')
-'''
 
 # Model and optimizer
 model = GCN(nfeat=features.shape[1],
             nhid=args.hidden,
             nclass=labels.max().item() + 1,
-            dropout=args.dropout)
+            dropout=args.dropout,
+            nnz=adj.nnz())
 optimizer = optim.Adam(model.parameters(),
                        lr=args.lr, weight_decay=args.weight_decay)
 
@@ -75,14 +64,13 @@ if args.cuda:
 
 def train(epoch):
     t = time.time()
-    model.train()   #this sets the module in training mode. Some layers (e.g., dropout and batchnorm) behave different under train and eval (test) mode
+    model.train()  
     optimizer.zero_grad()
-    output = model(features, adj)   #this is the same as model.forward(features, adj), i.e., a forward pass. Hence returns final embedding
-    loss_train = F.nll_loss(output[idx_train], labels[idx_train])   #negative log likelihood loss, (input: torch.Tensor, target: torch.Tensor)
-                                #NOTE: it is enough that the shape of output is (-1, C: number of classes), no need to specify
-    acc_train = accuracy(output[idx_train], labels[idx_train])  #(I think) The max of the elements is taken to find classification prediction and compute accuracy.
-    loss_train.backward() #performs backpropogation, make sure gradients are zeroed beforehand.
-    optimizer.step()      #performs optimisation step
+    output = model(features, adj)
+    loss_train = F.nll_loss(output[idx_train], labels[idx_train])
+    acc_train = accuracy(output[idx_train], labels[idx_train])  
+    loss_train.backward()
+    optimizer.step()     
     
     if not args.fastmode:
         # Evaluate validation set performance separately,
@@ -92,8 +80,10 @@ def train(epoch):
 
     loss_val = F.nll_loss(output[idx_val], labels[idx_val])
     acc_val = accuracy(output[idx_val], labels[idx_val])
+    #Keep track of train and val. accuracy
     accval_lst.append(acc_val.item())
     acctrn_lst.append(acc_train.item())
+
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_train: {:.4f}'.format(loss_train.item()),
           'acc_train: {:.4f}'.format(acc_train.item()),

@@ -13,6 +13,7 @@ class GraphConvolution(Module):
 
     def __init__(self, in_features, out_features, bias=True):
         super(GraphConvolution, self).__init__()
+        self.sparsemm = SpecialSpmm()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.FloatTensor(in_features, out_features))
@@ -28,9 +29,11 @@ class GraphConvolution(Module):
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
 
-    def forward(self, input, adj):
-        support = torch.mm(input, self.weight)  #torch.mm = matrix multiplication
-        output = torch.spmm(adj, support)       #torch.spmm = sparse matrix multiplication. NOTE: .spmm might be removed, check .sparse module
+    def forward(self, input, indices, values, size):
+        support = torch.mm(input, self.weight)  
+        #output = torch.spmm(adj, support)    
+        output = self.sparsemm(indices, values, size, support)
+
         if self.bias is not None:
             return output + self.bias 
         else:
