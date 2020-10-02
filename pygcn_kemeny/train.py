@@ -11,7 +11,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from pygcn.utils import load_data, accuracy
-from pygcn.models import GCN
+#from pygcn.models import GCN
+from models import GCN
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -48,7 +49,7 @@ model = GCN(nfeat=features.shape[1],
             nhid=args.hidden,
             nclass=labels.max().item() + 1,
             dropout=args.dropout,
-            nnz=adj.nnz())
+            nnz=adj._nnz())
 optimizer = optim.Adam(model.parameters(),
                        lr=args.lr, weight_decay=args.weight_decay)
 
