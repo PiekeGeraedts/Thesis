@@ -1,3 +1,4 @@
+.gitignore
 pygcn_kemeny/notes.txt
 P.log
 log_to_P.py
