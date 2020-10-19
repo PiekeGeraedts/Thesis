@@ -11,15 +11,14 @@ class GCN(nn.Module):
         super(GCN, self).__init__()
         self.gc1 = GraphConvolution(nfeat, nhid)
         self.gc2 = GraphConvolution(nhid, nclass)
-        self.weighted_adj = Parameter(torch.FloatTensor(nnz))
         self.dropout = dropout
 
     def init_adj():
         #initialise the adjacency weights
         pass
  
-    def forward(self, x, adj):
-        x = F.relu(self.gc1(x, adj._indices(), self.weighted_adj, adj.size()))
+    def forward(self, x, indices, edge_weights, size):
+        x = F.relu(self.gc1(x, indices, edge_weights, size))
         x = F.dropout(x, self.dropout, training=self.training)
-        x = self.gc2(x, adj._indices(), self.weighted_adj, adj.size())
+        x = self.gc2(x, indices, edge_weights, size)
         return F.log_softmax(x, dim=1)

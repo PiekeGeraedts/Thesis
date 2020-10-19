@@ -129,8 +129,9 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
 
 def Kemeny(indices, values, size):
     """Calculate the Kemeny constant."""
-    P = torch.sparse.DoubleTensor(indices, values.clamp(0,1), size)
-    return MarkovChain(P.to_dense().numpy()).K
+    #why clamp here? softmax should get rid of the problem of negative values
+    P = torch.sparse.DoubleTensor(indices, values, size)
+    return torch.DoubleTensor([MarkovChain(P.detach().to_dense().numpy()).K])
 
 
 def Kemeny_spsa(indices, values, size, eta):
