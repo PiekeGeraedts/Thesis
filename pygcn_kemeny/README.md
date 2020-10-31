@@ -1,0 +1,2 @@
+This package is used for the model where the gcn loss is calculated as normal and the kemeny loss is calculated by forcing backpropagation to calculate the kemeny constant derivative using SPSA formula (train_SPSA.py). Also the REINFORCE method is given to estimate the derivative of the Kemeny constant (train_REINFORCE.py). Finally, we have an implementation that simply changes the gradients of the edge weight parameter and does not force backward to calculate any gradient over the kemeny loss part (train_SPSA1.py).
+

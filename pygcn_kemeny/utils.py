@@ -3,6 +3,7 @@ import scipy.sparse as sp
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
+import torch.nn.functional as F
 from Markov_chain.Markov_chain_new import MarkovChain
 
 class SpecialSpmmFunction(torch.autograd.Function):
@@ -11,7 +12,6 @@ class SpecialSpmmFunction(torch.autograd.Function):
 
         source: PyGAT, https://github.com/Diego999/pyGAT
     """
-
     @staticmethod
     def forward(ctx, indices, values, shape, b):
         assert indices.requires_grad == False
@@ -129,28 +129,96 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
 
 def Kemeny(indices, values, size):
     """Calculate the Kemeny constant."""
-    #why clamp here? softmax should get rid of the problem of negative values
-    P = torch.sparse.DoubleTensor(indices, values, size)
-    return torch.DoubleTensor([MarkovChain(P.detach().to_dense().numpy()).K])
+    P = torch.sparse.DoubleTensor(indices, values, size).detach().to_dense().numpy()
+    return torch.DoubleTensor([MarkovChain(P).K])
 
 
 def Kemeny_spsa(indices, values, size, eta):
     """Calculate gradient of Kemeny constant using SPSA."""
     #NOTE: the gradients are only calculated for the edges in the network.
-    n = values.shape[0]
-    delta = np.random.choice([-1,1], n)
+    nnz = values.shape[0]
+    delta = torch.FloatTensor(np.random.choice([-1,1], nnz))
 
-    values1 = (values + eta*delta).clamp(0,1)   #is this implementation oke? Using clamp(0,1), but also using SPSA for not all params.
-    values2 = (values - eta*delta).clamp(0,1)
+    values1 = normalisation1(indices, torch.add(values, delta, alpha=eta), size)
+    values2 = normalisation1(indices, torch.sub(values, delta, alpha=eta), size)
 
     P1 = torch.sparse.FloatTensor(indices, values1, size) 
     P2 = torch.sparse.FloatTensor(indices, values2, size)
 
-    K1 = MarkovChain(P1.to_dense().numpy()).K
-    K2 = MarkovChain(P2.to_dense().numpy()).K
+    K1 = MarkovChain(P1.to_dense().detach().numpy()).K
+    K2 = MarkovChain(P2.to_dense().detach().numpy()).K
+    
+    return torch.mul(torch.pow(delta, exponent=-1), (K1-K2)/2*eta)
 
-    grads = torch.FloatTensor([(K1-K2)/2*eta*delta[i] for i in range(n)])
-    return grads
+def softmax_norm(indices, values, size):
+    """Normalise the adjacency matrix with softmax. Problem with using softmax on the entire row is that the zeros are transformed to nnz."""
+    for i in range(size[0]):
+        idx = torch.where(indices[0] == i)[0]
+        values[idx] = F.softmax(values[idx], dim=0)
+    return values
+    
+def normalisation1(indices, values, size):
+    """This normalisation squares the input then divides by sum of the squares"""
+    #NOTE: this normalisation has a pool at zero, e.g., if the parameter is a zero row then this does not scale to probability dist.
+    for i in range(size[0]):
+        idx = torch.where(indices[0] == i)[0]
+        if (torch.sum(torch.mul(values[idx], values[idx])) == 0):
+            values[idx] = F.softmax(values[idx], dim=0)
+        values[idx] = torch.mul(values[idx], values[idx])/torch.sum(torch.mul(values[idx], values[idx]))
+    return values
+
+def normalisation2(indices, values, size):
+    """This normalisation is as in arXiv:1309.1541: "a rigid shift of the points to the right of the Y-asis"."""
+    for i in range(size[0]):
+        idx = torch.where(indices[0] == i)[0]
+        tmp = torch.sort(values[idx], descending=True)[0]
+        for j in len(tmp):
+            if (tmp[j] + 1/j(1-sum(tmp[:j])) > 0):
+                rho = j
+        lbd = 1/rho*(1-sum(tmp[:rho]))
+        values[idx] = values[idx] + lbd
+        values[idx] = max(values[idx, torch.zeros_like(values[idx])])
+
+def nan_to_zero(mx):
+    """Set all nan values to zero"""
+    coo = np.where(torch.isnan(mx) == True)
+    #print (coo)
+    return len(coo[0])
+    #print (len(coo[0]) + len(coo[1])) 
+    if (len(coo[0]) + len(coo[1]) == 0):
+        #there where no inf numbers, continues as usual
+        pass
+    else:
+        print (f'There are {len(coo[0]) + len(coo[1])} nan numbers, fit it!')
+        exit()
+        mx[coo[0], coo[1]] = 0
+    #return mx
+
+def inf_to_large(mx):
+    """Set all inf values to large(st) float value"""
+    import sys
+    max_float = sys.float_info.max
+    #print (torch.sum(torch.isinf(mx).view(-1) == True))
+    
+    coo = np.where(torch.isinf(mx) == True)
+    if (len(coo[0]) + len(coo[1]) == 0):
+        #there where no inf numbers, continues as usual
+        pass
+    else:
+        print ('There are inf numbers, fit it!')
+        exit()
+        mx[coo[0], coo[1]] = max_float
+    #return mx
+
+def constraint(weights, initial, mu):
+    """Clamps all values of the weighted adjacency to the mu nieghbourhood of initial"""
+    #NOTE: takes roughly 0.033 seconds for nnz=896, might be a bigger problem when using this on Cora.
+    nnz = weights.shape[0]
+    for i in range(nnz):
+        weights[i] = weights[i].clamp(initial[i]-mu, initial[i]+mu)
+    return weights
 
 
 
+
+    
