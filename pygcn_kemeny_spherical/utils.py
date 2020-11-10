@@ -120,30 +120,8 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
 
-def toP(Theta):
-    """
-    Purpose: 
-        Convert the Theta transition matrix using spherical coordinates to a P transition matrix using cartesian coordinates
-    Input:
-        Theta - a (nx(n-1))-matrix (numpy array) with angles
-    Output:
-        P - a (nxn)-matrix representing each row of the Theta matrix in cartesian coordinates, corresponding to a row in P. 
-                i.e., each row in P respresents a row in Theta.
-    """
-    n,_ = Theta.shape
-    P = np.zeros((n,n))
-    for j in range(n):
-        for i in range(n):  
-            if (i == n-1):
-                P[j,i] = np.prod([np.sin(Theta[j,:]), np.ones(n-1)])
-            else:
-                P[j,i] = np.prod([np.sin(Theta[j,:i]), np.ones(i)])*np.cos(Theta[j,i])
-    
-    return P**2
-
 def Kemeny(indices, values, size):
     """Calculate the Kemeny constant."""
-    #why clamp here? softmax should get rid of the problem of negative values
     P = torch.sparse.DoubleTensor(indices, values, size)
     return torch.DoubleTensor([MarkovChain(P.detach().to_dense().numpy()).K])
 
@@ -152,8 +130,9 @@ def Kemeny_spsa(indices, values, size, eta):
     #NOTE: the gradients are only calculated for the edges in the network.
     n = values.shape[0]
     delta = np.random.choice([-1,1], n)
-
-    values1 = (values + eta*delta).clamp(0,1)   #is this implementation oke? Using clamp(0,1), but also using SPSA for not all params.
+    #is this implementation oke? Using clamp(0,1), but also using SPSA for not all params.
+    #Use one of the normalisation functions!
+    values1 = (values + eta*delta).clamp(0,1)
     values2 = (values - eta*delta).clamp(0,1)
 
     P1 = torch.sparse.FloatTensor(indices, values1, size)
@@ -162,8 +141,51 @@ def Kemeny_spsa(indices, values, size, eta):
     K1 = MarkovChain(P1.to_dense().numpy()).K
     K2 = MarkovChain(P2.to_dense().numpy()).K
 
-    grads = torch.FloatTensor([(K1-K2)/2*eta*delta[i] for i in range(n)])
+    grads = torch.FloatTensor([(K1-K2)/2*eta*delta])
     return grads
+
+def softmax_norm(indices, values, size):
+    """Normalise the adjacency matrix with softmax. Problem with using softmax on the entire row is that the zeros are transformed to nnz."""
+    for i in range(size[0]):
+        idx = torch.where(indices[0] == i)[0]
+        values[idx] = F.softmax(values[idx], dim=0)
+    return values
+    
+def normalisation1(indices, values, size):
+    """This normalisation squares the input then divides by sum of the squares"""
+    #NOTE: this normalisation has a pool at zero, e.g., if the parameter is a zero row then this does not scale to probability dist.
+    for i in range(size[0]):
+        idx = torch.where(indices[0] == i)[0]
+        if (torch.sum(torch.mul(values[idx], values[idx])) == 0):
+            values[idx] = F.softmax(values[idx], dim=0)
+        values[idx] = torch.mul(values[idx], values[idx])/torch.sum(torch.mul(values[idx], values[idx]))
+    return values
+
+def normalisation2(indices, values, size):
+    """This normalisation is as in arXiv:1309.1541: "a rigid shift of the points to the right of the Y-asis"."""
+    for i in range(size[0]):
+        idx = torch.where(indices[0] == i)[0]
+        tmp = torch.sort(values[idx], descending=True)[0]
+        for j in len(tmp):
+            if (tmp[j] + 1/j(1-sum(tmp[:j])) > 0):
+                rho = j
+        lbd = 1/rho*(1-sum(tmp[:rho]))
+        values[idx] = values[idx] + lbd
+        values[idx] = max(values[idx, torch.zeros_like(values[idx])])
+
+def constraint1(weights, initial, mu):
+    """Clamps all values of the weighted adjacency to the mu nieghbourhood of initial"""
+    #NOTE: takes roughly 0.033 seconds for nnz=896, might be a bigger problem when using this on Cora.
+    nnz = weights.shape[0]
+    for i in range(nnz):
+        weights[i] = weights[i].clamp(initial[i]-mu, initial[i]+mu)
+    return weights
+
+def constraint2(weights, initial, mu):
+    pass
+    
+
+
 
 
 

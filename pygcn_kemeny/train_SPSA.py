@@ -15,11 +15,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 #from pygcn_kemeny.utils import load_data, accuracy, Kemeny, Kemeny_spsa, WeightClipper
-from utils import load_data, accuracy, Kemeny, Kemeny_spsa, normalisation1
+from utils import load_data, accuracy, Kemeny, Kemeny_spsa, normalisation1, normalisation2, softmax_normalisation
 #from pygcn_kemeny.models import GCN
 from models import GCN
 from Markov_chain.Markov_chain_new import MarkovChain
-
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -100,10 +99,6 @@ if args.cuda:
     idx_val = idx_val.cuda()
     idx_test = idx_test.cuda()
 
-def Kemeny(indices, values, size):
-    P = torch.sparse.FloatTensor(indices, values, size)
-    return torch.DoubleTensor([MarkovChain(P.detach().to_dense().numpy()).K])
-
 def train(epoch):
     t = time.time()
     #eta = 1/np.log10(epoch+10)
@@ -111,40 +106,37 @@ def train(epoch):
     model.train()  
     optimizer.zero_grad()
     with torch.no_grad():
-        #model.edge_weights = softmax_norm(adj_indices, model.edge_weights, adj_size)
-        model.edge_weights = normalisation1(adj_indices, model.edge_weights, adj_size)
+        model.edge_weights = normalisation2(adj_indices, model.edge_weights, adj_size)
     output = model(features, adj_indices, model.edge_weights, adj_size)
     gcn_loss = F.nll_loss(output[idx_train], labels[idx_train])
 
     with torch.no_grad():
-        '''
         perturbation = torch.FloatTensor(np.random.choice([-1,1], nnz)) * eta
         edge_weights0, edge_weights1 = torch.add(model.edge_weights, perturbation), torch.sub(model.edge_weights, perturbation) 
         
-        normalized0, normalized1 = normalisation1(adj_indices, edge_weights0, adj_size), normalisation1(adj_indices, edge_weights1, adj_size)
+        normalized0, normalized1 = normalisation2(adj_indices, edge_weights0, adj_size), normalisation2(adj_indices, edge_weights1, adj_size)
 
         kemeny_loss0 = Kemeny(adj_indices, normalized0, adj_size)
         kemeny_loss1 = Kemeny(adj_indices, normalized1, adj_size)
-        '''
         K = Kemeny(adj_indices, model.edge_weights, adj_size)
-        K_lst.append(K)
+        if K > 50000:
+            K_lst.append(50000)
+        elif K < -50000:
+            K_lst.append(-50000)
+        else:
+            K_lst.append(K)
   
-    loss_train = gcn_loss #- gamma*sum(model.edge_weights * ((kemeny_loss0 - kemeny_loss1)/2*perturbation))
-    acc_train = accuracy(output[idx_train], labels[idx_train])  
+    loss_train =  -gamma*sum(model.edge_weights * ((kemeny_loss0 - kemeny_loss1)/(2*perturbation)))
+    acc_train = accuracy(output[idx_train], labels[idx_train])
     loss_train.backward()
+
     with torch.no_grad():
-       # model.edge_weights.grad = torch.sub(model.edge_weights.grad, Kemeny_spsa(adj_indices, model.edge_weights, adj_size, eta), alpha=gamma)
-        model.edge_weights.grad += -gamma*Kemeny_spsa(adj_indices, model.edge_weights, adj_size, eta)
+        gradspsa_lst.append(torch.norm(torch.mul(Kemeny_spsa(adj_indices, model.edge_weights, adj_size, perturbation), -gamma))) 
+        gradedgeweights_lst.append(torch.norm(model.edge_weights.grad))
+        edgeweights_lst.append(torch.norm(model.edge_weights))
+
     optimizer.step()
 
-    #check analytical gradient
-    '''
-    print ('checking gradient...')
-    t = time.time()
-    print (torch.autograd.gradcheck(Kemeny, (adj_indices, edge_weights.double(), adj_size)))
-    print (time.time()-t)
-    exit()
-    '''
     if not args.fastmode:
         model.eval()
         output = model(features, adj_indices, model.edge_weights, adj_size)
@@ -154,7 +146,6 @@ def train(epoch):
     #Keep track of train and val. accuracy
     accval_lst.append(acc_val.item())
     acctrn_lst.append(acc_train.item())
-    gradedgeweights_lst.append(torch.norm(model.edge_weights.grad))  
 
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_train: {:.4f}'.format(loss_train.item()),
@@ -162,7 +153,6 @@ def train(epoch):
           'loss_val: {:.4f}'.format(loss_val.item()),
           'acc_val: {:.4f}'.format(acc_val.item()),
           'time: {:.4f}s'.format(time.time() - t))
-
 
 def test(): #similar to train, but in eval mode and on test data.
     model.eval()
@@ -183,7 +173,9 @@ K_lst = []
 K0_lst = []
 K1_lst = []
 gradedgeweights_lst = []
-tmp1=[]
+gradspsa_lst = []
+edgeweights_lst = []
+tmp_lst = []
 for epoch in range(args.epochs):
     train(epoch)
 print("Optimization Finished!")
@@ -208,9 +200,19 @@ ax.set_title('Accuracy Validation Set')
 fig.savefig(path + '{:.0f}_accuracyvalidation.jpg'.format(t_total))
 
 fig, ax = plt.subplots()
+ax.plot(edgeweights_lst)
+ax.set_title('Progress norm edge weights')
+fig.savefig(path + '{:.0f}_edgeweights.jpg'.format(t_total))
+
+fig, ax = plt.subplots()
 ax.plot(gradedgeweights_lst)
 ax.set_title('Progress gradient norm edge weights')
 fig.savefig(path + '{:.0f}_gradedgeweights.jpg'.format(t_total))
+
+fig, ax = plt.subplots()
+ax.plot(gradspsa_lst)
+ax.set_title('Progress gradient norm spsa')
+fig.savefig(path + '{:.0f}_gradspsa.jpg'.format(t_total))
 
 fig, ax = plt.subplots()
 ax.plot(K_lst)
@@ -218,8 +220,8 @@ ax.set_title('Progress Kemeny')
 fig.savefig(path + '{:.0f}_kemeny.jpg'.format(t_total))
 
 fig, ax = plt.subplots()
-ax.plot(tmp1)
-fig.savefig(path + '{:.0f}_tmp1.jpg'.format(t_total))
+ax.plot(tmp_lst)
+fig.savefig(path + '{:.0f}_tmp.jpg'.format(t_total))
 
 #fig, ax = plt.subplots()
 #ax.plot(K0_lst)
@@ -249,6 +251,7 @@ for neighboors, node in lst:
     print ('normalised original adjacency:', normalisation1(adj_indices, initial_edge_weights, adj_size)[neighboors])
     print ('adjacency:', model.edge_weights[neighboors])
     print ('normalized adjacency:', np.round(normalisation1(adj_indices, model.edge_weights.detach().clone(), adj_size)[neighboors],3))
+    print (labels[node], model(features, adj_indices, adj._values(), adj_size)[node])
     print ('================================')
     
 

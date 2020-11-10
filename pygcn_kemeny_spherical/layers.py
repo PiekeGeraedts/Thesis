@@ -5,6 +5,7 @@ import torch
 from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
 from pygcn_kemeny.utils import SpecialSpmm
+from tools import SphToAdj 
 
 
 class GraphConvolution(Module):
@@ -32,7 +33,9 @@ class GraphConvolution(Module):
 
     def forward(self, input, indices, values, size):
         support = torch.mm(input, self.weight)  
-        output = self.sparsemm(indices, values, size, support)
+        with torch.no_grad():
+            adj_values = SphToAdj(indices, values, size)
+        output = self.sparsemm(indices, adj_values, size, support)
 
         if self.bias is not None:
             return output + self.bias 

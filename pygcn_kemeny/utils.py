@@ -127,57 +127,74 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
 
-def Kemeny(indices, values, size):
+
+def Kemeny(indices, values, size, tol = 1e-5):
     """Calculate the Kemeny constant."""
-    P = torch.sparse.DoubleTensor(indices, values, size).detach().to_dense().numpy()
-    return torch.DoubleTensor([MarkovChain(P).K])
+    values[abs(values) < tol] = 0.0 #the 'zeros' from values and the to_dense() operation are seen as different! 
+    P = torch.sparse.FloatTensor(indices, values, size)    
+    MC = MarkovChain(P.detach().to_dense().numpy())
+    return torch.FloatTensor([MC.K]), torch.FloatTensor([MC.nEc]), torch.FloatTensor([MC.nTc])
 
-
-def Kemeny_spsa(indices, values, size, eta):
+def Kemeny_spsa(indices, values, size, perturbation):
     """Calculate gradient of Kemeny constant using SPSA."""
     #NOTE: the gradients are only calculated for the edges in the network.
-    nnz = values.shape[0]
-    delta = torch.FloatTensor(np.random.choice([-1,1], nnz))
+#    nnz = values.shape[0]
+#    delta = torch.FloatTensor(np.random.choice([-1,1], nnz))
 
-    values1 = normalisation1(indices, torch.add(values, delta, alpha=eta), size)
-    values2 = normalisation1(indices, torch.sub(values, delta, alpha=eta), size)
+    values1 = normalisation2(indices, torch.add(values, perturbation), size)
+    values2 = normalisation2(indices, torch.sub(values, perturbation), size)    
 
-    P1 = torch.sparse.FloatTensor(indices, values1, size) 
-    P2 = torch.sparse.FloatTensor(indices, values2, size)
-
-    K1 = MarkovChain(P1.to_dense().detach().numpy()).K
-    K2 = MarkovChain(P2.to_dense().detach().numpy()).K
+    K1 = Kemeny(indices, values1, size)
+    K2 = Kemeny(indices, values2, size)
     
-    return torch.mul(torch.pow(delta, exponent=-1), (K1-K2)/2*eta)
+    #return torch.mul(torch.pow(delta, exponent=-1), (K1-K2)/2*eta)
+    return torch.mul(torch.pow(perturbation, exponent=-1), (K1-K2)/2)
 
-def softmax_norm(indices, values, size):
+def softmax_normalisation(indices, values, size, b=0):
     """Normalise the adjacency matrix with softmax. Problem with using softmax on the entire row is that the zeros are transformed to nnz."""
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
-        values[idx] = F.softmax(values[idx], dim=0)
+        values[idx] = F.softmax(values[idx]-b, dim=0)
     return values
     
-def normalisation1(indices, values, size):
+def squared_normalisation(indices, values, size):
     """This normalisation squares the input then divides by sum of the squares"""
     #NOTE: this normalisation has a pool at zero, e.g., if the parameter is a zero row then this does not scale to probability dist.
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
-        if (torch.sum(torch.mul(values[idx], values[idx])) == 0):
+        if (torch.equal(values[idx], torch.zeros_like(values[idx]))):
             values[idx] = F.softmax(values[idx], dim=0)
-        values[idx] = torch.mul(values[idx], values[idx])/torch.sum(torch.mul(values[idx], values[idx]))
+        else:
+            values[idx] = torch.mul(values[idx], values[idx])/torch.sum(torch.mul(values[idx], values[idx]))
     return values
 
-def normalisation2(indices, values, size):
+def subtract_normalisation(indices, values, size):
+    """This normalisation trick first makes the values positive then divides by the sum"""
+    for i in range(size[0]):
+        idx = torch.where(indices[0] == i)[0]
+        min_val = torch.min(values[idx])
+        #add min_val if min_val is negative
+        if (min_val < 0):
+            values[idx] = torch.sub(values[idx], min_val)
+        #if values[idx] is zero row use softmax
+        if (torch.equal(values[idx], torch.zeros_like(values[idx]))):
+            values[idx] = F.softmax(values[idx], dim=0)
+        else: 
+            values[idx] = torch.div(values[idx], torch.sum(values[idx]))        
+    return values
+
+def paper_normalisation(indices, values, size):
     """This normalisation is as in arXiv:1309.1541: "a rigid shift of the points to the right of the Y-asis"."""
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
         tmp = torch.sort(values[idx], descending=True)[0]
-        for j in len(tmp):
-            if (tmp[j] + 1/j(1-sum(tmp[:j])) > 0):
-                rho = j
+        for j in range(len(tmp)):
+            if (tmp[j] + 1/(j+1)*(1-sum(tmp[:(j+1)])) > 0):
+                rho = j+1
         lbd = 1/rho*(1-sum(tmp[:rho]))
         values[idx] = values[idx] + lbd
-        values[idx] = max(values[idx, torch.zeros_like(values[idx])])
+        values[idx] = torch.max(values[idx], torch.zeros_like(values[idx]))
+    return values
 
 def nan_to_zero(mx):
     """Set all nan values to zero"""
@@ -218,7 +235,3 @@ def constraint(weights, initial, mu):
         weights[i] = weights[i].clamp(initial[i]-mu, initial[i]+mu)
     return weights
 
-
-
-
-    

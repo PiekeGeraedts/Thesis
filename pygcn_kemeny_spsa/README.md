@@ -1,0 +1,1 @@
+This package is aimed at using the SPSA method to calculate all derivatives. That is, there is no use of backpropagation in this package. Rather the gcn loss is calculated using two forward passes of the network and the kemeny loss using two calculations of the Kemeny constant. 
