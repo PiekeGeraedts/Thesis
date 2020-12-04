@@ -79,7 +79,6 @@ def load_data(path="../data/cora/", dataset="cora"):
     adj = sp.coo_matrix((np.ones(edges.shape[0]), (edges[:, 0], edges[:, 1])),
                         shape=(labels.shape[0], labels.shape[0]),
                         dtype=np.float64)
-
     # build symmetric adjacency matrix
     adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
 
@@ -128,21 +127,19 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     return torch.sparse.FloatTensor(indices, values, shape)
 
 
-def Kemeny(indices, values, size, tol = 1e-5):
+def Kemeny(indices, values, size, tol = 1e-8):
     """Calculate the Kemeny constant."""
-    values[abs(values) < tol] = 0.0 #the 'zeros' from values and the to_dense() operation are seen as different! 
+    values[abs(values) < tol] = 0.0  #cast values close to zero to zero.
+    #NOTE: this is no longer needed if we do not allow values to drop below eps!
     P = torch.sparse.FloatTensor(indices, values, size)    
     MC = MarkovChain(P.detach().to_dense().numpy())
-    return torch.FloatTensor([MC.K]), torch.FloatTensor([MC.nEc]), torch.FloatTensor([MC.nTc])
+    return torch.FloatTensor([MC.K])
 
-def Kemeny_spsa(indices, values, size, perturbation):
+
+def Kemeny_spsa(indices, values, size, perturbation, normalise, eps=0.001):
     """Calculate gradient of Kemeny constant using SPSA."""
-    #NOTE: the gradients are only calculated for the edges in the network.
-#    nnz = values.shape[0]
-#    delta = torch.FloatTensor(np.random.choice([-1,1], nnz))
-
-    values1 = normalisation2(indices, torch.add(values, perturbation), size)
-    values2 = normalisation2(indices, torch.sub(values, perturbation), size)    
+    values1 = normalise(indices, torch.add(values, perturbation), size, eps)
+    values2 = normalise(indices, torch.sub(values, perturbation), size, eps)    
 
     K1 = Kemeny(indices, values1, size)
     K2 = Kemeny(indices, values2, size)
@@ -150,41 +147,65 @@ def Kemeny_spsa(indices, values, size, perturbation):
     #return torch.mul(torch.pow(delta, exponent=-1), (K1-K2)/2*eta)
     return torch.mul(torch.pow(perturbation, exponent=-1), (K1-K2)/2)
 
-def softmax_normalisation(indices, values, size, b=0):
+def softmax_normalisation(indices, values, size, eps=0.001):
     """Normalise the adjacency matrix with softmax. Problem with using softmax on the entire row is that the zeros are transformed to nnz."""
+    #values = torch.add(values, eps)
+    #--adding epsilon here doesn't do much. Not sure how to do this yet. 
+    print ("doesn't work for epsilon yet!")
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
-        values[idx] = F.softmax(values[idx]-b, dim=0)
+        values[idx] = F.softmax(values[idx], dim=0)
     return values
     
-def squared_normalisation(indices, values, size):
+def squared_normalisation(indices, values, size, eps=0.001):
     """This normalisation squares the input then divides by sum of the squares"""
-    #NOTE: this normalisation has a pool at zero, e.g., if the parameter is a zero row then this does not scale to probability dist.
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
+        #NOTE: in this case epsilon doesn't work
         if (torch.equal(values[idx], torch.zeros_like(values[idx]))):
             values[idx] = F.softmax(values[idx], dim=0)
         else:
-            values[idx] = torch.mul(values[idx], values[idx])/torch.sum(torch.mul(values[idx], values[idx]))
+            values[idx] = torch.mul(values[idx], values[idx])
+            denominator = torch.div(torch.sum(values[idx]), (1-eps*idx.shape[0]))
+            values[idx] = torch.div(values[idx], denominator)     
+            values[idx] = torch.add(values[idx], eps)
     return values
 
-def subtract_normalisation(indices, values, size):
+def subtract_normalisation(indices, values, size, eps=0.001):
     """This normalisation trick first makes the values positive then divides by the sum"""
+    #add eps after min value has been added
+    #print (eps)
+    #print (torch.argmin(values))
+    #print (values[torch.argmin(values)])
+    #print (indices[0,torch.argmin(values)])
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
         min_val = torch.min(values[idx])
         #add min_val if min_val is negative
         if (min_val < 0):
-            values[idx] = torch.sub(values[idx], min_val)
-        #if values[idx] is zero row use softmax
+            values[idx] = torch.sub(values[idx], min_val)   
+        #if values[idx] is zero row use softmax, NOTE: in this case epsilon doesn't work
         if (torch.equal(values[idx], torch.zeros_like(values[idx]))):
             values[idx] = F.softmax(values[idx], dim=0)
         else: 
-            values[idx] = torch.div(values[idx], torch.sum(values[idx]))        
+            #if (i == 163):
+            #    print (torch.min(values[idx]))
+
+            denominator = torch.sum(values[idx])/(1-eps*idx.shape[0])
+            values[idx] = torch.div(values[idx], denominator)        
+            values[idx] = torch.add(values[idx], eps)
+            #if (i == 163):
+            #    print (denominator)
+            #    print (print (values[idx]))
+            #    print (torch.min(values[idx]))
+            #    exit()
+    #print (min(values))
+    #exit()
     return values
 
-def paper_normalisation(indices, values, size):
+def paper_normalisation(indices, values, size, eps=0.001):
     """This normalisation is as in arXiv:1309.1541: "a rigid shift of the points to the right of the Y-asis"."""
+    values = torch.add(values, eps) #could also use .clamp(eps, 1-eps)
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
         tmp = torch.sort(values[idx], descending=True)[0]
@@ -206,7 +227,7 @@ def nan_to_zero(mx):
         #there where no inf numbers, continues as usual
         pass
     else:
-        print (f'There are {len(coo[0]) + len(coo[1])} nan numbers, fit it!')
+        print (f'There are {len(coo[0]) + len(coo[1])} nan numbers, fix it!')
         exit()
         mx[coo[0], coo[1]] = 0
     #return mx
@@ -222,7 +243,7 @@ def inf_to_large(mx):
         #there where no inf numbers, continues as usual
         pass
     else:
-        print ('There are inf numbers, fit it!')
+        print ('There are inf numbers, fix it!')
         exit()
         mx[coo[0], coo[1]] = max_float
     #return mx

@@ -7,18 +7,16 @@ from pygcn_kemeny.layers import GraphConvolution
 #from layers import GraphConvolution
 
 class GCN(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout, nnz, adj):
+    def __init__(self, nfeat, nhid, nclass, dropout, nnz, adj, rand=False):
         super(GCN, self).__init__()
         self.gc1 = GraphConvolution(nfeat, nhid)
         self.gc2 = GraphConvolution(nhid, nclass)
         # How do we want to initialise the edge weights?
-        #self.edge_weights = Parameter(torch.randn(nnz))
-        #-- random
-        self.edge_weights = Parameter(adj._values())
-        #-- as Tkipf (1/degree)
-        #self.edge_weights = Parameter(torch.zeros(nnz))
-        #self.init_edgeweights(adj._indices())
-        #-- self absorbing
+        if rand:
+            self.edge_weights = Parameter(torch.randn(nnz))
+        else:
+            self.edge_weights = Parameter(adj._values())
+        
         self.dropout = dropout
 
     def init_adj():

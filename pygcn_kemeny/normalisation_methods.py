@@ -14,14 +14,21 @@ def softmax_normalisation(x):
 def squared_normalisation(mx):
 	return mx**2/sum(mx**2)
 
-def Sean_normalisation(mx):
+def subtract_normalisation(mx, eps=0):
 	min_mx = min(mx)
 	if (min_mx < 0):
 		mx -= min_mx
-		mx = mx/sum(mx)
-	else:
-		mx = mx/sum(mx)
+	mx += eps
+	mx = mx/sum(mx)	
 	return mx
+
+def subtract_normalisation2(mx, eps=0):	
+	min_mx = min(mx)
+	if (min_mx < 0):
+		mx -= min_mx	
+	x = sum(mx)/(1-len(mx)*eps)
+	return mx/x + eps
+	
 
 def spsa(mx, eta):
 	n = mx.shape[0]
@@ -45,6 +52,7 @@ for i in range(N):
 	#keep track
 	grad_lst.append(np.linalg.norm(grad))
 '''
+
 K = 10
 #SOFTMAX
 for k in range(K):
@@ -72,7 +80,7 @@ for k in range(K):
 	plt.title('squared normalisation')
 plt.show()
 
-#SEAN
+#SUBTRACT
 for k in range(K):
 	n = 4
 	N = 10
@@ -80,13 +88,33 @@ for k in range(K):
 	lst[0] = np.random.randn(n)
 
 	for i in range(1,N+1):
-		lst[i] = Sean_normalisation(lst[i-1])
+		lst[i] = subtract_normalisation2(lst[i-1],0.01)
 
 	plt.plot(lst)
-	plt.title('Sean normalisation')
+	plt.title('subtract normalisation')
+plt.show()
+print (lst[N])
+exit()
+
+#testing subtract2
+N = 100
+n=3
+eps = 0.001
+lst1 = []
+lst2 = []
+lst3 = []
+
+for i in range(N):	
+	vec = np.random.randn(n)
+	lst1.append(min(subtract_normalisation2(vec.copy(),eps)))
+
+	
+plt.plot(lst1, label='minima eps=0.01')
+plt.plot([eps], marker='.', label=eps)
+plt.legend()
+plt.title('minimum of adjusted subtract normalisation')
 plt.show()
 
-
-
+print (f'for eps={eps} minimum of minima is: {min(lst1)}')
 
 
