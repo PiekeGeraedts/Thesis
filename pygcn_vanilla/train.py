@@ -135,6 +135,11 @@ for child in model.children():
 
 torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'epoch':epoch}, 'model-optimised.pt')
 
+print ('###Parameter norms')
+for param in model.parameters():
+    print (torch.norm(param[0].detach()))
+    print ('===')
+
 #Plotting
 plt.plot(acctrn_lst)
 plt.title('Accuracy Train Set')
