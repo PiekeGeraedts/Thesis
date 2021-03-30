@@ -1,0 +1,14 @@
+2021-01-13
+nlayers:6
+epochs:200+0
+clipper:False
+lr:0.01+0.15
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:softmax
+GCN loss test:tensor(1.8375, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.3500, dtype=torch.float64)
+loss test:tensor(1.8375, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.3500, dtype=torch.float64)

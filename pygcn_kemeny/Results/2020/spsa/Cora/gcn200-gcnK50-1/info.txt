@@ -1,0 +1,6 @@
+This folder contains results for the following optimisation:
+
+- We optimised the standard gcn model for 200 epochs and later introduced Kemeny's constant as regularizer and trained the gcn model for another 50 epochs. The edge weights were trainable parameters from the start, we could have also chosen to fix these at the initialisation value and only train them when we introduces the Kemeny regularizer (see other folder).  
+
+- Hyperparameter choices can be found in the log.txt file. 
+

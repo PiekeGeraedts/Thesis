@@ -1,0 +1,32 @@
+2021-01-27
+nlayers:2
+epochs:200+200
+clipper:True
+random:False
+lr:0.01+0.01
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:softmax
+average grad norm edge weights:tensor(2203806.5000)
+GCN loss test:tensor(0.8716, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.7533, dtype=torch.float64)
+loss test:tensor(0.8440, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.7367, dtype=torch.float64)
+2021-01-27
+nlayers:2
+epochs:200+200
+clipper:True
+random:False
+lr:0.01+0.01
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:softmax
+average grad norm edge weights:tensor(5.9230)
+GCN loss test:tensor(0.8835, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.7433, dtype=torch.float64)
+loss test:tensor(0.8500, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.7467, dtype=torch.float64)

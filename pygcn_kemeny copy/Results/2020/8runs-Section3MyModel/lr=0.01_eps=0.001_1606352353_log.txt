@@ -1,0 +1,7 @@
+2020-11-26
+clipper:True
+gamma:1e-06
+Eta is chosen fixed at 0.0001
+normalisation method:<function subtract_normalisation at 0x13708fa60>
+loss test:tensor(0.7242, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.8310, dtype=torch.float64)

@@ -1,0 +1,11 @@
+2020-12-16
+epochs:200+0
+clipper:False
+gamma:1e-06
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:squared
+GCN loss test:tensor(2.0072, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.5200, dtype=torch.float64)
+loss test:tensor(2.0072, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.5200, dtype=torch.float64)

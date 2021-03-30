@@ -1,0 +1,15 @@
+2021-01-16
+nlayers:6
+epochs:300+100
+clipper:False
+random:False
+lr:0.01+0.01
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:spherical
+GCN loss test:tensor(1.8402, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.3500, dtype=torch.float64)
+loss test:tensor(1.8383, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.3500, dtype=torch.float64)

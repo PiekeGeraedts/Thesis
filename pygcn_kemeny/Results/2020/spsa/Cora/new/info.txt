@@ -1,0 +1,1 @@
+folder name : {norm}/{args.nlayer}_{args.epochs}_{N}_{args.clipper}_{args.lr}_

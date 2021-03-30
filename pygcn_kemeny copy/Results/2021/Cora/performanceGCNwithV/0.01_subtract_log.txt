@@ -1,0 +1,70 @@
+2021-01-14
+nlayers:4
+epochs:100+0
+clipper:False
+lr:0.001+0.01
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:subtract
+GCN loss test:tensor(1.9309, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.1533, dtype=torch.float64)
+loss test:tensor(8.1060, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.1500, dtype=torch.float64)
+2021-01-14
+nlayers:4
+epochs:100+0
+clipper:True
+lr:0.001+0.01
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:subtract
+GCN loss test:tensor(665.7847, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.3467, dtype=torch.float64)
+loss test:tensor(1.9902, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.3433, dtype=torch.float64)
+2021-01-14
+nlayers:4
+epochs:300+0
+clipper:True
+lr:0.001+0.01
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:subtract
+GCN loss test:tensor(1527128.3750, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.2167, dtype=torch.float64)
+loss test:tensor(784.6450, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.2167, dtype=torch.float64)
+2021-01-14
+nlayers:4
+epochs:300+0
+clipper:True
+lr:0.01+0.01
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:subtract
+GCN loss test:tensor(18711.2559, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.3367, dtype=torch.float64)
+loss test:tensor(707.3782, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.3067, dtype=torch.float64)
+2021-01-14
+nlayers:2
+epochs:500+0
+clipper:False
+lr:0.01+0.01
+gamma:1e-06
+eps:0.001
+Eta is chosen fixed at 0.0001
+projection:False
+normalisation method:subtract
+GCN loss test:tensor(2.8007, grad_fn=<NllLossBackward>)
+GCN acc_test:tensor(0.3500, dtype=torch.float64)
+loss test:tensor(4.1304, grad_fn=<NllLossBackward>)
+acc_test:tensor(0.3233, dtype=torch.float64)
