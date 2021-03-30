@@ -4,16 +4,16 @@ import torch
 
 from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
-from pygcn_kemeny.utils import SpecialSpmm
+from utils import SpecialSpmm, subtract_normalisation
+from tools import SphToAdj
 
 
 class GraphConvolution(Module):
     """
     Simple GCN layer, similar to https://arxiv.org/abs/1609.02907
     """
-
     def __init__(self, in_features, out_features, bias=True):
-        super(GraphConvolution, self).__init__()
+        super(GraphConvolution, self).__init__()    #I don't understand why you would give the class and self to super here, since Module is the parent class not GC. 
         self.sparsemm = SpecialSpmm()
         self.in_features = in_features
         self.out_features = out_features
@@ -31,6 +31,8 @@ class GraphConvolution(Module):
             self.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, input, indices, values, size):
+        #with torch.no_grad():
+        #    nrmld = subtract_normalisation(indices, values.clone(), size)
         support = torch.mm(input, self.weight)  
         output = self.sparsemm(indices, values, size, support)
 

@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from pygcn.utils import load_data, accuracy
-from pygcn.models import GCN
+from models6 import GCN
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -37,8 +37,8 @@ parser.add_argument('--dropout', type=float, default=0.5,
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-np.random.seed(args.seed)
-torch.manual_seed(args.seed)
+#np.random.seed(args.seed)
+#torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
@@ -62,6 +62,7 @@ model = GCN(nfeat=features.shape[1],
             nhid=args.hidden,
             nclass=labels.max().item() + 1,
             dropout=args.dropout)
+
 optimizer = optim.Adam(model.parameters(),
                        lr=args.lr, weight_decay=args.weight_decay)
 
@@ -122,33 +123,19 @@ print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 
 # Testing
 test()
-print (dir(model))
-print ('##Printing model.buffers')
-for buffer in model.buffers():
-    print (buffer)
-print ('##Printing model.named_buffers')
-for named_buffer in model.named_buffers():
-    print (named_buffer)
-print ('##Printing model.children')
-for child in model.children():
-    print (child)
 
-torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'epoch':epoch}, 'model-optimised.pt')
-
-print ('###Parameter norms')
-for param in model.parameters():
-    print (torch.norm(param[0].detach()))
-    print ('===')
+torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'epoch':epoch}, '6model-optimised.pt')
+torch.save({'indices': adj._indices(), 'values': adj._values(), 'size': adj.size(), 'features': features, 'labels': labels, 'idx_train': idx_train, 'idx_val': idx_val, 'idx_test': idx_test, 'embeddings':model.embedding_dict}, '6input.pt')
 
 #Plotting
 plt.plot(acctrn_lst)
 plt.title('Accuracy Train Set')
-#plt.savefig('accuracytrain_{:.3f}.jpg'.format(time.time()))
+plt.savefig('4accuracytrain_{:.3f}.jpg'.format(time.time()))
 #plt.show()
 
 plt.plot(accval_lst)
 plt.title('Accuracy Validation Set')
-#plt.savefig('accuracyvalidation_{:.3f}.jpg'.format(time.time()))
+plt.savefig('4accuracyvalidation_{:.3f}.jpg'.format(time.time()))
 #plt.show()
 
 #import save_load

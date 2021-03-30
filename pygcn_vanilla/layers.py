@@ -29,8 +29,8 @@ class GraphConvolution(Module):
             self.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, input, adj):
-        support = torch.mm(input, self.weight)  #torch.mm = matrix multiplication
-        output = torch.spmm(adj, support)       #torch.spmm = sparse matrix multiplication. NOTE: .spmm might be removed, check .sparse module
+        support = torch.mm(input, self.weight) 
+        output = torch.spmm(adj, support)       
         if self.bias is not None:
             return output + self.bias 
         else:

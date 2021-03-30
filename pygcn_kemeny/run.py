@@ -1,51 +1,33 @@
+"""
+Purpose:
+	Small script to call train multiple times. Handy for hyperparameterization.
+Date:
+	15-11-2020
+"""
 import sys
 import os
-gamma_lst = [1000, 100, 10, 1 ,0., 0.1, 0.01, 0.001, 0.0001, 0.00001]
 
-#for gamma in gamma_lst:
-#	os.system(f"python3 train_SPSA.py --epochs 500 --gamma {gamma}")
+# softmax 
+os.system(f"python3 train_SPSA.py --softmax --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 1")
+os.system(f"python3 train_SPSA.py --softmax --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 12")
+os.system(f"python3 train_SPSA.py --softmax --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 123")
+# squared
+os.system(f"python3 train_SPSA.py --squared --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 1")
+os.system(f"python3 train_SPSA.py --squared --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 12")
+os.system(f"python3 train_SPSA.py --squared --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 123")
+# subtract
+os.system(f"python3 train_SPSA.py --subtract --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 1")
+os.system(f"python3 train_SPSA.py --subtract --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 12")
+os.system(f"python3 train_SPSA.py --subtract --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 123")
+# spherical
+os.system(f"python3 train_SPSA.py --spherical --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 1")
+os.system(f"python3 train_SPSA.py --spherical --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 12")
+os.system(f"python3 train_SPSA.py --spherical --epochs 200 --N 200 --clipper --fastmode --nlayer 6 --seed 123")
 
 
-os.system(f"python3 train_SPSA.py --epochs 500")
-os.system(f"python3 train_SPSA.py --epochs 500 --lr 0.001")
-os.system(f"python3 train_SPSA.py --epochs 500 --clipper")
-os.system(f"python3 train_SPSA.py --epochs 500 --eps 0.0")
 
-os.system(f"python3 train_SPSA.py --epochs 1000")
-os.system(f"python3 train_SPSA.py --epochs 1000 --clipper")
-os.system(f"python3 train_SPSA.py --epochs 1000 --eps 0.0")
-os.system(f"python3 train_SPSA.py --epochs 1000 --eps 0.0 --lr 0.001")
 
-'''
-#epochs=1000 folder
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.001")	#constant eta
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.001 --linear")
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.001 --sqrt")
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.001 --log")
-
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.01")	#constant eta
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.01 --linear")
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.01 --sqrt")
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.01 --log")
-
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.0")	#constant eta
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.0 --linear")
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.0 --sqrt")
-os.system(f"python3 test.py --epochs 1000 --lr 0.01 --eps 0.0 --log")
-
-#epochs=3000 folder
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.0001")	#constant eta
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.0001 --linear")
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.0001 --sqrt")
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.0001 --log")
-
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.001")	#constant eta
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.001 --linear")
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.001 --sqrt")
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.001 --log")
-
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.0")	#constant eta
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.0 --linear")
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.0 --sqrt")
-os.system(f"python3 test.py --epochs 3000 --lr 0.001 --eps 0.0 --log")
-'''
+#os.system(f"python3 KemenyOptimisation.py --softmax --epochs 300 --eps 0.01")
+#os.system(f"python3 KemenyOptimisation.py --squared --epochs 300 --eps 0.01")
+#os.system(f"python3 KemenyOptimisation.py --subtract --epochs 300 --eps 0.01")
+#os.system(f"python3 KemenyOptimisationSpherical.py --epochs 300 --eps 0.01")

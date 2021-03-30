@@ -1,6 +1,0 @@
-2020-11-11
-gamma:1e-06
-Eta is chosen decreasing with 1/(n+1)
-normalisation method:<function subtract_normalisation at 0x136f3c9d8>
-loss test:tensor(0.7658, grad_fn=<NllLossBackward>)
-acc_test:tensor(0.4200, dtype=torch.float64)

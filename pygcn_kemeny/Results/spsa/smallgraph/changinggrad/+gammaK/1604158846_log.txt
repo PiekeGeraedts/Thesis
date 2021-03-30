@@ -1,5 +1,0 @@
-2020-10-31
-0.1
-Eta is chosen decreasing with 1/(n+1)
-tensor(1.9400, grad_fn=<NllLossBackward>)
-tensor(0.4200, dtype=torch.float64)

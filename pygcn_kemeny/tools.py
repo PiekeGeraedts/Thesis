@@ -4,7 +4,7 @@ Author:
 Date created: 
     19/10/2020    
 Purpose:
-    Make tools (for spherical coordinate transformation).
+    Tools (for spherical coordinate transformation).
 '''
 import numpy as np
 import torch
@@ -18,7 +18,7 @@ from Markov_chain.Markov_chain_new import MarkovChain
     #--Just wondering what the best would be. Input for the function is still torch so torch and numpy/python need to combine. Probably doesn't matter.
 
 
-def plot_grad_flow(named_parameters):
+def plot_grad_flow(named_parameters, save=False, path=None):
     '''Plots the gradients flowing through different layers in the net during training.
     Can be used for checking for possible gradient vanishing / exploding problems.
     
@@ -29,6 +29,7 @@ def plot_grad_flow(named_parameters):
     layers = []
     for n, p in named_parameters:
         if(p.requires_grad) and ("bias" not in n):
+            n = n.replace('_weight', '')
             layers.append(n)
             ave_grads.append(p.grad.abs().mean())
             max_grads.append(p.grad.abs().max())
@@ -37,7 +38,8 @@ def plot_grad_flow(named_parameters):
     plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
     plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
     plt.xlim(left=0, right=len(ave_grads))
-    plt.ylim(bottom = -0.001, top=0.02) # zoom in on the lower gradient regions
+
+    plt.ylim(bottom = -0.001, top=0.2)#top=max(ave_grads)*2) # zoom in on the lower gradient regions
     plt.xlabel("Layers")
     plt.ylabel("average gradient")
     plt.title("Gradient flow")
@@ -45,7 +47,40 @@ def plot_grad_flow(named_parameters):
     plt.legend([Line2D([0], [0], color="c", lw=4),
                 Line2D([0], [0], color="b", lw=4),
                 Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
+    if save:
+        plt.savefig(path+'grad_flow.jpg')
+
+def plot_grad_flow1(named_parameters, save=False, path=None):
+    '''Plots the gradients flowing through different layers in the net during training.
+    Can be used for checking for possible gradient vanishing / exploding problems.
     
+    Usage: Plug this function in Trainer class after loss.backwards() as 
+    "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
+    ave_grads = []
+    max_grads= []
+    layers = []
+    for n, p in named_parameters:
+        if(p.requires_grad) and ("bias" not in n):
+            n = n.replace('_weight', '')
+            layers.append(n)
+            ave_grads.append(p.grad.abs().mean())
+            max_grads.append(p.grad.abs().max())
+    plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
+    plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
+    plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
+    plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+    plt.xlim(left=0, right=len(ave_grads))
+
+    plt.ylim(bottom = -0.001, top=max(ave_grads)*2) # zoom in on the lower gradient regions
+    plt.xlabel("Layers")
+    plt.ylabel("average gradient")
+    plt.title("Gradient flow")
+    plt.grid(True)
+    plt.legend([Line2D([0], [0], color="c", lw=4),
+                Line2D([0], [0], color="b", lw=4),
+                Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
+    if save:
+        plt.savefig(path+'grad_flow1.jpg')
 
 #NOTE: The four methods for the spherical transformation and back work. However, the error from rounding might be a bit large.
 def toSpherical(vec):
@@ -90,21 +125,20 @@ def toCartesian(sph, eps=0):
             cart[i] = r*torch.cos(sph[i])*torch.prod(torch.sin(sph[:i]))
     return cart**2
 
-def SphToAdj(indices, values, size):
+def SphToAdj(indices, values, size, eps=0):
     """convert the sparse spherical matrix to a sparse adjacency matrix.
         Note: only returns the values."""
-    values = values
     cart_values = torch.zeros(len(indices[0]))
     sum_idx = 0
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
-        cart_values[idx] = toCartesian(values[sum_idx:sum_idx+len(idx)-1])
+        cart_values[idx] = torch.add(toCartesian(values[sum_idx:sum_idx+len(idx)-1], eps), eps)
         sum_idx += len(idx) - 1
     return cart_values
 
-def KemenySpherical(indices, values, size):
-    """Calculate Kemeny's constant. values should be spherical coordinates """
-    P = torch.sparse.DoubleTensor(indices, SphToAdj(indices, values.detach(), size), size)
+def KemenySpherical(indices, values, size, eps=0):
+    """Calculate Kemeny's constant. values should be spherical coordinates"""
+    P = torch.sparse.DoubleTensor(indices, SphToAdj(indices, values.detach(), size, eps), size)
     return torch.DoubleTensor([MarkovChain(P.detach().to_dense().numpy()).K])
 
 

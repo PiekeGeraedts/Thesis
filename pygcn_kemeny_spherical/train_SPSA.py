@@ -16,7 +16,7 @@ import torch.optim as optim
 
 #from pygcn_kemeny.utils import load_data, accuracy, Kemeny, Kemeny_spsa, WeightClipper
 from utils import load_data, accuracy, normalisation1, constraint1
-from tools import AdjToSph, SphToAdj, toP, KemenySpherical
+from tools import AdjToSph, SphToAdj, toCartesian, KemenySpherical, plot_grad_flow
 #from pygcn_kemeny.models import GCN
 from models import GCN
 from scipy.spatial.distance import euclidean
@@ -54,13 +54,13 @@ if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
 # Load data
-#adj, features, labels, idx_train, idx_val, idx_test = load_data()
 adj = torch.FloatTensor(np.load('A.npy')).to_sparse()
 labels = torch.LongTensor(np.load('labels.npy'))     
 features = torch.FloatTensor(np.load('features.npy'))
 idx_train = torch.LongTensor(range(30))
 idx_val = torch.LongTensor(range(30,50))
 idx_test = torch.LongTensor(range(50,100))
+#adj, features, labels, idx_train, idx_val, idx_test = load_data()
 
 #parameters
 adj_indices = adj._indices()
@@ -134,20 +134,19 @@ def train(epoch):
     if not args.fastmode:
         model.eval()
         output = model(features, adj_indices, adj._values(), adj_size)
-
     loss_val = F.nll_loss(output[idx_val], labels[idx_val])
     acc_val = accuracy(output[idx_val], labels[idx_val])
     #Keep track of train and val. accuracy
     accval_lst.append(acc_val.item())
     acctrn_lst.append(acc_train.item())
-
+    plot_grad_flow(model.named_parameters())
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_train: {:.4f}'.format(loss_train.item()),
           'acc_train: {:.4f}'.format(acc_train.item()),
           'loss_val: {:.4f}'.format(loss_val.item()),
           'acc_val: {:.4f}'.format(acc_val.item()),
           'time: {:.4f}s'.format(time.time() - t))
-
+    
 def test(): 
     model.eval()
     output = model(features, adj_indices, adj._values(), adj_size)
@@ -170,6 +169,7 @@ tmp1_lst = []
 tmp2_lst = []
 for epoch in range(args.epochs):
     train(epoch)
+plt.show()
 print("Optimization Finished!")
 print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 
@@ -211,7 +211,7 @@ fig.savefig(path + '{:.0f}_kemeny1.jpg'.format(t_total))
 log = np.array([str(date.today()), str(gamma), eta_info, str(loss_test), str(acc_test)])
 #reasoning log list name: t is added so that the corresponding graphs can be found again.
 #np.save('Graphs/{:.3f}_log.npy'.format(t), log)
-with open(path + "{:.0f}_log.txt".format(t),"a") as file1:
+with open(path + "{:.0f}_log.txt".format(t), "a") as file1:
     for line in log:
         file1.write(line)
         file1.write('\n')
@@ -222,9 +222,9 @@ for neighboor, node in lst:
     print ('Considering node:', node)
     print ('Equal distribution is:', 1/len(neighboor))
     print ('original spherical adjacency:', initial_edge_weights[neighboor])
-    print ('original adjacency:', toP(initial_edge_weights[neighboor]))
+    print ('original adjacency:', toCartesian(initial_edge_weights[neighboor]))
     print ('spherical adjacency:', model.edge_weights[neighboor])
-    print ('adjacency:', np.round(toP(model.edge_weights[neighboor]).detach(),3))
+    print ('adjacency:', np.round(toCartesian(model.edge_weights[neighboor]).detach(),3))
     print (labels[node], model(features, adj_indices, adj._values(), adj_size)[node])
     print ('================================')
 

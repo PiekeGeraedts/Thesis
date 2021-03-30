@@ -85,9 +85,9 @@ def load_data(path="../data/cora/", dataset="cora"):
     features = normalize(features)
     adj = normalize(adj + sp.eye(adj.shape[0]))
 
-    idx_train = range(140)
-    idx_val = range(200, 500)
-    idx_test = range(500, 1500)
+    idx_train = range(75)
+    idx_val = range(100, 200)
+    idx_test = range(200, 500)
 
     features = torch.FloatTensor(np.array(features.todense()))
     labels = torch.LongTensor(np.where(labels)[1])
@@ -150,62 +150,50 @@ def Kemeny_spsa(indices, values, size, perturbation, normalise, eps=0.001):
 def softmax_normalisation(indices, values, size, eps=0.001):
     """Normalise the adjacency matrix with softmax. Problem with using softmax on the entire row is that the zeros are transformed to nnz."""
     #values = torch.add(values, eps)
-    #--adding epsilon here doesn't do much. Not sure how to do this yet. 
-    print ("doesn't work for epsilon yet!")
+    tmp = torch.zeros_like(values)
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
-        values[idx] = F.softmax(values[idx], dim=0)
-    return values
+        #maximum = torch.max(values[idx])
+        tmp[idx] = F.softmax(values[idx], dim=0)*(1-eps*idx.shape[0])
+        tmp[idx] = torch.add(tmp[idx], eps)
+        
+    return tmp
     
 def squared_normalisation(indices, values, size, eps=0.001):
     """This normalisation squares the input then divides by sum of the squares"""
+    tmp = torch.zeros_like(values)
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
         #NOTE: in this case epsilon doesn't work
         if (torch.equal(values[idx], torch.zeros_like(values[idx]))):
-            values[idx] = F.softmax(values[idx], dim=0)
+            tmp[idx] = F.softmax(values[idx], dim=0)
         else:
-            values[idx] = torch.mul(values[idx], values[idx])
-            denominator = torch.div(torch.sum(values[idx]), (1-eps*idx.shape[0]))
-            values[idx] = torch.div(values[idx], denominator)     
-            values[idx] = torch.add(values[idx], eps)
-    return values
+            tmp[idx] = torch.mul(values[idx], values[idx])
+            denominator = torch.div(torch.sum(tmp[idx]), (1-eps*idx.shape[0]))
+            tmp[idx] = torch.div(tmp[idx], denominator)     
+            tmp[idx] = torch.add(tmp[idx], eps)
+    return tmp
 
 def subtract_normalisation(indices, values, size, eps=0.001):
     """This normalisation trick first makes the values positive then divides by the sum"""
-    #add eps after min value has been added
-    #print (eps)
-    #print (torch.argmin(values))
-    #print (values[torch.argmin(values)])
-    #print (indices[0,torch.argmin(values)])
+    tmp = torch.zeros_like(values)
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
-        min_val = torch.min(values[idx])
-        #add min_val if min_val is negative
-        if (min_val < 0):
-            values[idx] = torch.sub(values[idx], min_val)   
+        min_val = min(torch.min(values[idx]),0)
+        tmp[idx] = torch.sub(values[idx], min_val)   
         #if values[idx] is zero row use softmax, NOTE: in this case epsilon doesn't work
-        if (torch.equal(values[idx], torch.zeros_like(values[idx]))):
-            values[idx] = F.softmax(values[idx], dim=0)
+        if (torch.equal(tmp[idx], torch.zeros_like(tmp[idx]))):
+            tmp[idx] = F.softmax(values[idx], dim=0)
         else: 
-            #if (i == 163):
-            #    print (torch.min(values[idx]))
-
-            denominator = torch.sum(values[idx])/(1-eps*idx.shape[0])
-            values[idx] = torch.div(values[idx], denominator)        
-            values[idx] = torch.add(values[idx], eps)
-            #if (i == 163):
-            #    print (denominator)
-            #    print (print (values[idx]))
-            #    print (torch.min(values[idx]))
-            #    exit()
-    #print (min(values))
-    #exit()
-    return values
+            denominator = torch.sum(tmp[idx])/(1-eps*idx.shape[0])
+            tmp[idx] = torch.div(tmp[idx], denominator)        
+            tmp[idx] = torch.add(tmp[idx], eps)
+    
+    return tmp
 
 def paper_normalisation(indices, values, size, eps=0.001):
     """This normalisation is as in arXiv:1309.1541: "a rigid shift of the points to the right of the Y-asis"."""
-    values = torch.add(values, eps) #could also use .clamp(eps, 1-eps)
+    values = torch.add(values, eps) 
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
         tmp = torch.sort(values[idx], descending=True)[0]
@@ -216,6 +204,15 @@ def paper_normalisation(indices, values, size, eps=0.001):
         values[idx] = values[idx] + lbd
         values[idx] = torch.max(values[idx], torch.zeros_like(values[idx]))
     return values
+
+def rowdiscrep(indices, values, size):
+    discrep = 0
+    for i in range(size[0]):
+        idx = torch.where(indices[0] == i)[0]
+        row_sum = sum(values[idx])
+        discrep += abs(1-row_sum)
+    print ('discrepancy of row sums added:', discrep)
+    print ('discrepancy of sum - n:', abs(int(size[0]) - sum(values)))
 
 def nan_to_zero(mx):
     """Set all nan values to zero"""
@@ -255,4 +252,22 @@ def constraint(weights, initial, mu):
     for i in range(nnz):
         weights[i] = weights[i].clamp(initial[i]-mu, initial[i]+mu)
     return weights
+
+
+'''
+indices = torch.LongTensor([[0,0,1,2],[1,2,2,1]])
+size = (3,3)
+vec = torch.randn(4)
+
+V = torch.sparse.FloatTensor(indices, vec, size)
+nrm = paper_normalisation(indices, vec, size)
+
+print (vec)
+print (nrm)
+print (torch.sparse.FloatTensor(indices, nrm, size).to_dense())
+print (sum(torch.sparse.FloatTensor(indices, nrm, size).to_dense()))
+'''
+
+
+
 

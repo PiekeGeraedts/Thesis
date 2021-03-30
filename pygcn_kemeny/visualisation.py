@@ -1,10 +1,17 @@
+"""
+Purpose:
+	Visualise the effect of the Kemeny regularizer. 
+Date:
+	03-12-2020
+"""
+
 import torch
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 from networkx.drawing.nx_agraph import graphviz_layout
 
-A = torch.FloatTensor(np.load('A.npy')).to_sparse()
+A = torch.FloatTensor(np.load('data/A.npy')).to_sparse()
 weights = A._values().numpy()	#symmetrically weighted
 indices = A._indices().numpy()
 weights1 = np.load('weights.npy')	#results from optimising Kemeny --lr 0.01 --epochs 200 --eps 0.001
@@ -32,7 +39,6 @@ for edge in edges:
 
 
 #graphviz_layout(G)
-
 nx.draw(G, width=weights)
 plt.show()
 nx.draw(G, pos=nx.spring_layout(G), width=weights)

@@ -18,7 +18,7 @@ import numpy as np
 np.random.seed(42)
 torch.manual_seed(42)
 
-def test(): #similar to train, but in eval mode and on test data.
+def test():
     model.eval()
     output = model(features, adj)
     loss_test = F.nll_loss(output[idx_test], labels[idx_test])
@@ -31,7 +31,11 @@ def test(): #similar to train, but in eval mode and on test data.
 #test()
 #print ('========')
 #exit()
+
 adj, features, labels, idx_train, idx_val, idx_test = load_data()
+input = torch.load('input.pt')
+adj = torch.sparse.FloatTensor(input['indices']input['values'], input['size'])
+features, labels, idx_train, idx_val, idx_test = input['features'], input['labels'], input['idx_train'], input['idx_val'], input['idx_test']
 
 kwargs = {"dropout":0.5, "nfeat":features.shape[1], "nclass":labels.max().item()+1, "nhid":16}
 model = GCN(**kwargs)

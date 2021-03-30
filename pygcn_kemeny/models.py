@@ -3,111 +3,108 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.nn.parameter import Parameter
-from pygcn_kemeny.layers import GraphConvolution
-#from layers import GraphConvolution
+#from pygcn_kemeny.layers import GraphConvolution
+from layers import GraphConvolution
+from tools import AdjToSph, SphToAdj
+from utils import softmax_normalisation, squared_normalisation, subtract_normalisation
 
 class GCN(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout, nnz, adj, rand=False):
+    def __init__(self, dims, dropout, adj, nrm_mthd, projection, learnable=True, rand=False):
+        #dims should be a list, dropout a float, and adj the sparse adjencency. 
+        #dims = [nfeat, nhid1, .., nhid, nclass], i.e., size of nlayer+1, hence, dims also says the amount of layers.
+        #learnable=False doesn't work yet.
         super(GCN, self).__init__()
-        self.gc1 = GraphConvolution(nfeat, nhid)
-        self.gc2 = GraphConvolution(nhid, nclass)
-        # How do we want to initialise the edge weights?
-        if rand:
-            self.edge_weights = Parameter(torch.randn(nnz))
-        else:
-            self.edge_weights = Parameter(adj._values())
-        
+        self.gcn, self.embeddings_dict = self.init_layers(dims)    
+        self.indices = adj._indices()
+        self.size = adj.size()  
+        self.learnable = learnable
+        self.projection= projection
+        self.spherical, self.normalise = self.check_substitution(nrm_mthd)
+        self.edge_weights = self.init_adj(adj, rand)
         self.dropout = dropout
+        
+    def check_substitution(self, nrm_mthd):
+        spherical = False
+        if nrm_mthd == 'spherical':
+            spherical = True
+            normalise = SphToAdj
+        elif nrm_mthd == 'softmax':
+            normalise = softmax_normalisation
+        elif nrm_mthd == 'squared':
+            normalise = squared_normalisation
+        elif nrm_mthd == 'subtract':
+            normalise = subtract_normalisation
+        else:
+            assert False, 'Invalid normalisation type'
+        return spherical, normalise 
 
-    def init_adj():
-        #initialise the adjacency weights
-        pass
- 
-    def forward(self, x, indices, values, size):
-        x = F.relu(self.gc1(x, indices, self.edge_weights, size))
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = self.gc2(x, indices, self.edge_weights, size)
+    def init_layers(self, dims):
+        nlayers = len(dims) - 1
+        gcn = {}
+        embeddings_dict = {'h0':None}
+        for i in range(nlayers):
+            gc_layer = GraphConvolution(dims[i], dims[i+1]) #optional: bias=False 
+            gcn['gc'+str(i+1)] = gc_layer
+            #This does not feel like the best solution, given that the GC already makes the parameters.
+            #they aren't added to parameter bcs gc is not a global variable in this class and,
+            #bcs the gcn dict is a dict of classes.
+            self.register_parameter(f'gc{i+1}_weight', gc_layer.weight)
+            self.register_parameter(f'gc{i+1}_bias', gc_layer.bias)
+            embeddings_dict['h'+str(i+1)] = None
+        return gcn, embeddings_dict
+
+    def init_adj(self, adj, rand):
+        if self.spherical:
+            if not self.learnable:
+                edge_weights = AdjToSph(self.indices, adj._values(), self.size)
+            else:
+                if rand:
+                    edge_weights = Parameter(torch.randn(adj._nnz()-self.size[0]))
+                else:
+                    edge_weights = Parameter(AdjToSph(self.indices, adj._values(), self.size))
+        else:
+            if not self.learnable:
+                edge_weights = adj._values()
+            else:
+                if rand:
+                    edge_weights = Parameter(torch.randn(adj._nnz()))
+                else:
+                    edge_weights = Parameter(adj._values())
+        return edge_weights
+
+    def update_embeddings_dict(self, lst):
+        #note no activation has been applied to the output of the last layer.
+        for i in range(len(lst)):
+            self.embeddings_dict['h'+str(i)] = lst[i]
+
+    def forward(self, x): 
+        #convert spherical to adjacency if needed
+        if self.learnable:
+            if self.projection and not self.spherical:  #cannot use spherical to do projections, if spherical and projection then just do spherical.
+                with torch.no_grad():
+                    self.edge_weights.data = self.normalise(self.indices, self.edge_weights, self.size)
+                values = self.edge_weights  #does it matter if I use .clone() here?
+            else:   
+                values = self.normalise(self.indices, self.edge_weights, self.size)
+                #print (self.edge_weights)
+                #print (values)
+                #print (self.indices)
+                #exit()
+        else:
+            values = self.edge_weights
+        lst = [x]
+        for gc in self.gcn:
+            gc_layer = self.gcn[gc]
+            if gc == 'gc' + str(len(self.gcn)):                    
+                x = gc_layer(x, self.indices, values, self.size)
+            else:
+                x = F.relu(gc_layer(x, self.indices, values, self.size))
+                x = F.dropout(x, self.dropout, training=self.training)
+            lst.append(x)
+        self.update_embeddings_dict(lst)
+
         return F.log_softmax(x, dim=1)
 
 
-
-'''
-import numpy as np
-import matplotlib.pyplot as plt
-def softmax(x):
-    return np.exp(x)/sum(np.exp(x))
-
-def squared(x):
-    return x**2/sum(x**2)
-
-
-N = 10000
-K = 50
-n = 5
-
-for k in range(K):
-    x1 = np.random.random(n)
-    x2 = np.random.random(n)
-    x1_lst = [x1]
-    x2_lst = [x2]
-
-    for i in range(N):
-        x1 = softmax(x1)
-        x2 = squared(x2)
-        x1_lst.append(x1)
-        #x2_lst.append(x2)
-        x2_lst.append(x2)
-
-   # plt.plot(x1_lst)
-    plt.plot(x2_lst)
-plt.show()
-
-lst1 = np.zeros((2,N))
-lst2 = np.zeros((2,N))
-for i in range(N):
-    rnd = np.random.random(2) #random in [0,1]
-    p = rnd/sum(rnd)
-    r = np.sqrt(p)
-    lst1[0,i] = p[0]
-    lst1[1,i] = p[1]
-    lst2[0,i] = r[0]
-    lst2[1,i] = r[1]
-
-x_axis = np.linspace(0,1,N)
-y_axis = 1 - x_axis
-lst1 = np.array([x_axis, y_axis])
-x1_axis = np.sqrt(x_axis)
-y1_axis = np.sqrt(y_axis)
-lst2 = np.array([x1_axis, y1_axis])
-
-plt.scatter(lst1[0],lst1[1], s=2)
-plt.scatter(lst2[0],lst2[1], s=2)
-plt.show()
-
-x_axis = np.linspace(0,1,100)
-y_axis = 1 - x_axis
-x1_axis = np.sqrt(x_axis)
-y1_axis = np.sqrt(y_axis)
-points = np.array([x1_axis, y1_axis]).T
-lst2 = lst2.T
-density = []
-epsilon = 0.1
-
-from scipy.spatial.distance import euclidean
-
-for i in range(100):
-    #count number of points in lst2 that have a euclidean distance of less than epsilon with points
-    count = 0
-    for point in lst2:
-        if (euclidean(points[i], point) < epsilon):
-            count+=1
-    density.append(count)
-
-plt.scatter(points.T[0], points.T[1])
-plt.show()
-plt.plot(density)
-plt.show()
-
-'''
 
 

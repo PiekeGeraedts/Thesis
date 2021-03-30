@@ -1,6 +1,0 @@
-2020-11-25
-gamma:1e-06
-Eta is chosen fixed at 0.0001
-normalisation method:<function subtract_normalisation at 0x1368889d8>
-loss test:tensor(0.7448, grad_fn=<NllLossBackward>)
-acc_test:tensor(0.8300, dtype=torch.float64)

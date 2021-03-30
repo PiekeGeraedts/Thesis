@@ -72,28 +72,28 @@ def AdjToSph(indices, values, size):
     sph_values = torch.FloatTensor([item for sublist in sph_values for item in sublist])
     return torch.FloatTensor(sph_values)
 
-def toP(sph):
-    """n-1-dimensional spherical vector to (n)-dimensional cartesian vector"""
-    n = sph.shape[0]+1
+def toCartesian(sph, eps=0):
+    """Give the cartesian coordinates for radius 1-n*eps"""
+    n = sph.shape[0]+1    
     cart = torch.zeros(n)
+    r = np.sqrt(1 - n*eps)  #could also let r be input to the function and give it 1-n*eps in main.
     for i in range(n):
         if i==0:
-            cart[0] = torch.cos(sph[0])
+            cart[0] = r*torch.cos(sph[0])
         elif i == n-1:
-            cart[n-1] = torch.prod(torch.sin(sph))
+            cart[n-1] = r*torch.prod(torch.sin(sph))
         else:
-            cart[i] = torch.cos(sph[i])*torch.prod(torch.sin(sph[:i]))
+            cart[i] = r*torch.cos(sph[i])*torch.prod(torch.sin(sph[:i]))
     return cart**2
 
-def SphToAdj(indices, values, size):
+def SphToAdj(indices, values, size, eps=0):
     """convert the sparse spherical matrix to a sparse adjacency matrix.
         Note: only returns the values."""
-    values = values
     cart_values = torch.zeros(len(indices[0]))
     sum_idx = 0
     for i in range(size[0]):
         idx = torch.where(indices[0] == i)[0]
-        cart_values[idx] = toP(values[sum_idx:sum_idx+len(idx)-1])
+        cart_values[idx] = torch.add(toCartesian(values[sum_idx:sum_idx+len(idx)-1], eps), eps)
         sum_idx += len(idx) - 1
     return cart_values
 

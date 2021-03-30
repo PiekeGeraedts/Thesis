@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 #from pygcn_kemeny.layers import GraphConvolution
 from layers import GraphConvolution
-from tools import AdjToSph
+from tools import AdjToSph, SphToAdj 
 
 class GCN(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout, adj):
@@ -26,9 +26,9 @@ class GCN(nn.Module):
         #initialise the adjacency weights: Convert to spherical
         pass
         
- 
     def forward(self, x, indices, values, size):
-        x = F.relu(self.gc1(x, indices, self.edge_weights, size))
+        adj_values = SphToAdj(indices, self.edge_weights, size)        
+        x = F.relu(self.gc1(x, indices, adj_values, size))
         x = F.dropout(x, self.dropout, training=self.training)
-        x = self.gc2(x, indices, self.edge_weights, size)
+        x = self.gc2(x, indices, adj_values, size)
         return F.log_softmax(x, dim=1)
